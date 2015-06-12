@@ -46,16 +46,18 @@ LDAP_ATTRIBUTES = [
  @constructor
  */
 var LDAP = function(options) {
-	// Set options
-	this.options = _.defaults(options, LDAP_DEFAULTS);
 
 	// set default profile fields
+	LDAP_DEFAULTS.searchResultsProfileMap = [];
 	for (var i = 0; i < LDAP_ATTRIBUTES.length; i++) {
 		var map = {resultKey: LDAP_ATTRIBUTES[i], profileProperty: LDAP_ATTRIBUTES[i]};
 		LDAP_DEFAULTS.searchResultsProfileMap.push(map);
 	}
 	LDAP_DEFAULTS.searchResultsProfileMap.push({resultKey:'givenName', profileProperty: 'firstname'});
 	LDAP_DEFAULTS.searchResultsProfileMap.push({resultKey:'sn', profileProperty: 'lastname'});
+
+	// Set options
+	this.options = _.defaults(options, LDAP_DEFAULTS);
 
 	// Because NPM ldapjs module has some binary builds,
 	// We had to create a wraper package for it and build for
@@ -64,15 +66,36 @@ var LDAP = function(options) {
 	this.ldapjs = MeteorWrapperLdapjs;
 };
 
+
+/**
+ * Make a valid dn
+ *
+ * @method makeDn
+ *
+ * @param {Object} options  Object with uid
+ */
+LDAP.prototype.makeDn = function(options) {
+
+	var self = this;
+
+	options = options || {};
+
+	if (!options.hasOwnProperty('uid') ) {
+		throw new Meteor.Error(403, "Missing uid for making LDAP dn");
+	}
+
+	return DN_BASE.replace('[uid]',options.uid);
+};
+
 /**
  * Attempt to bind (authenticate) ldap
  * and perform a dn search if specified
  *
- * @method ldapCheck
+ * @method bind
  *
  * @param {Object} options  Object with username, ldapPass and overrides for LDAP_DEFAULTS object
  */
-LDAP.prototype.ldapCheck = function(options) {
+LDAP.prototype.bind = function(options) {
 
 	var self = this;
 
@@ -89,7 +112,7 @@ LDAP.prototype.ldapCheck = function(options) {
 		});
 
 		var username = options.username;
-		var dn = DN_BASE.replace('[uid]',username);
+		var dn = self.makeDn({'uid':username});
 
 		//Attempt to bind to ldap server with provided info
 		client.bind(dn, options.ldapPass, function(err) {
@@ -140,6 +163,43 @@ LDAP.prototype.ldapCheck = function(options) {
 
 };
 
+// TODO: pull out search function, expose to client
+/*
+LDAP.prototype.search = function(options) {
+
+	var self = this;
+
+	options = options || {};
+
+	if (options.hasOwnProperty('username')) {
+
+		var ldapAsyncFut = new Future();
+
+		// Create ldap client
+		var fullUrl = URL + ':' + PORT;
+		var client = self.ldapjs.createClient({
+			url: fullUrl
+		});
+
+		var username = options.username;
+		var dn = DN_BASE.replace('[uid]',username);
+
+		client.search(dn, {}, function(err, res) {
+
+			res.on('searchEntry', function(entry) {
+				// Add entry results to return object
+				retObject.searchResults = entry.object;
+
+				ldapAsyncFut.return(retObject);
+			});
+
+		});
+
+		return ldapAsyncFut.wait();
+	}
+
+};
+*/
 
 // Register login handler with Meteor
 // Here we create a new LDAP instance with options passed from
@@ -156,8 +216,8 @@ Accounts.registerLoginHandler("ldap", function(loginRequest) {
 	var userOptions = loginRequest.ldapOptions || {};
 	var ldapObj = new LDAP(userOptions);
 
-	// Call ldapCheck and get response
-	var ldapResponse = ldapObj.ldapCheck(loginRequest);
+	// Call bind and get response
+	var ldapResponse = ldapObj.bind(loginRequest);
 
 	if (ldapResponse.error) {
 		return {
