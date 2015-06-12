@@ -1,17 +1,45 @@
 Future = Npm.require('fibers/future');
 
-// At a minimum, set up LDAP_DEFAULTS.url and .dn according to
-// your needs. url should appear as "ldap://your.url.here"
-// dn should appear in normal ldap format of comma separated attribute=value
-// e.g. "uid=someuser,cn=users,dc=somevalue"
 LDAP_DEFAULTS = {
-	url: false,
-	port: '389',
-	dn: false,
 	createNewUser: true,
-	defaultDomain: false,
 	searchResultsProfileMap: false
 };
+
+URL = 'ldaps://ldap.uchicago.edu';
+PORT = '636';
+DN_BASE = 'uid=[uid],ou=People,dc=uchicago,dc=edu';
+DOMAIN = 'uchicago.edu';
+LDAP_ATTRIBUTES = [
+	'ucStudentID',
+	'uid',
+	'cn',
+	'chicagoID',
+	'eduPersonAffiliation',
+	'eduPersonPrimaryAffiliation',
+	'givenName',
+	'ucMiddleName',
+	'sn',
+	'gecos',
+	'ucNameSuffix',
+	'telephoneNumber',
+	'homePhone',
+	'ucPermanentTelephoneNumber',
+	'ucOfficeTelephoneNumber',
+	'postalAddress',
+	'homePostalAddress',
+	'ucPermanentPostalAddress',
+	'ucOfficePostalAddress',
+	'labeledURI',
+	'mail',
+	'mailRoutingAddress',
+	'mobile',
+	'ou',
+	'pager',
+	'title',
+	'ucAppointment',
+	'ucCurriculum',
+	'ucDepartment',
+	'eduPersonNickname'];
 
 /**
  @class LDAP
@@ -21,13 +49,13 @@ var LDAP = function(options) {
 	// Set options
 	this.options = _.defaults(options, LDAP_DEFAULTS);
 
-	// Make sure options have been set
-	try {
-		check(this.options.url, String);
-		check(this.options.dn, String);
-	} catch (e) {
-		throw new Meteor.Error("Bad Defaults", "Options not set. Make sure to set LDAP_DEFAULTS.url and LDAP_DEFAULTS.dn!");
+	// set default profile fields
+	for (var i = 0; i < LDAP_ATTRIBUTES.length; i++) {
+		var map = {resultKey: LDAP_ATTRIBUTES[i], profileProperty: LDAP_ATTRIBUTES[i]};
+		LDAP_DEFAULTS.searchResultsProfileMap.push(map);
 	}
+	LDAP_DEFAULTS.searchResultsProfileMap.push({resultKey:'givenName', profileProperty: 'firstname'});
+	LDAP_DEFAULTS.searchResultsProfileMap.push({resultKey:'sn', profileProperty: 'lastname'});
 
 	// Because NPM ldapjs module has some binary builds,
 	// We had to create a wraper package for it and build for
@@ -54,31 +82,17 @@ LDAP.prototype.ldapCheck = function(options) {
 
 		var ldapAsyncFut = new Future();
 
-
 		// Create ldap client
-		var fullUrl = self.options.url + ':' + self.options.port;
+		var fullUrl = URL + ':' + PORT;
 		var client = self.ldapjs.createClient({
 			url: fullUrl
 		});
 
-		// Slide @xyz.whatever from username if it was passed in
-		// and replace it with the domain specified in defaults
-		var emailSliceIndex = options.username.indexOf('@');
-		var username;
-		var domain = self.options.defaultDomain;
-
-		// If user appended email domain, strip it out
-		// And use the defaults.defaultDomain if set
-		if (emailSliceIndex !== -1) {
-			username = options.username.substring(0, emailSliceIndex);
-			domain = domain || options.username.substring((emailSliceIndex + 1), options.username.length);
-		} else {
-			username = options.username;
-		}
-
+		var username = options.username;
+		var dn = DN_BASE.replace('[uid]',username);
 
 		//Attempt to bind to ldap server with provided info
-		client.bind(self.options.dn, options.ldapPass, function(err) {
+		client.bind(dn, options.ldapPass, function(err) {
 			try {
 				if (err) {
 					// Bind failure, return error
@@ -91,11 +105,11 @@ LDAP.prototype.ldapCheck = function(options) {
 						searchResults: null
 					};
 					// Set email on return object
-					retObject.email = domain ? username + '@' + domain : false;
+					retObject.email = DOMAIN ? username + '@' + DOMAIN : false;
 
 					// Return search results if specified
 					if (self.options.searchResultsProfileMap) {
-						client.search(self.options.dn, {}, function(err, res) {
+						client.search(dn, {}, function(err, res) {
 
 							res.on('searchEntry', function(entry) {
 								// Add entry results to return object

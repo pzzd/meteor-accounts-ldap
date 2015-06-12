@@ -1,8 +1,8 @@
 Package.describe({
-  name: 'typ:accounts-ldap',
+  name: 'pzzd:accounts-ldap',
   version: '0.0.1',
   summary: 'Accounts login handler for LDAP using ldapjs from npm',
-  git: 'https://github.com/typ90/meteor-accounts-ldap',
+  git: 'https://github.com/pzzd/meteor-accounts-ldap',
   documentation: 'README.md'
 });
 
