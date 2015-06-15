@@ -105,7 +105,6 @@ LDAP.prototype.bind = function(options) {
 
 		var ldapAsyncFut = new Future();
 
-		// Create ldap client
 		var fullUrl = URL + ':' + PORT;
 		var client = self.ldapjs.createClient({
 			url: fullUrl
@@ -114,40 +113,20 @@ LDAP.prototype.bind = function(options) {
 		var username = options.username;
 		var dn = self.makeDn({'uid':username});
 
-		//Attempt to bind to ldap server with provided info
-		client.bind(dn, options.ldapPass, function(err) {
+		client.bind(dn, options.ldapPass, function(err, res) {
+			if (err) {
+				throw new Meteor.Error(err.code, err.message);
+			} 
+
 			try {
-				if (err) {
-					// Bind failure, return error
-					throw new Meteor.Error(err.code, err.message);
-				} else {
-					// Bind auth successful
-					// Create return object
-					var retObject = {
-						username: username,
-						searchResults: null
-					};
-					// Set email on return object
-					retObject.email = DOMAIN ? username + '@' + DOMAIN : false;
+				var retObject = {
+					username: username,
+					searchResults: null
+				};
 
-					// Return search results if specified
-					if (self.options.searchResultsProfileMap) {
-						client.search(dn, {}, function(err, res) {
-
-							res.on('searchEntry', function(entry) {
-								// Add entry results to return object
-								retObject.searchResults = entry.object;
-
-								ldapAsyncFut.return(retObject);
-							});
-
-						});
-					}
-					// No search results specified, return username and email object
-					else {
-						ldapAsyncFut.return(retObject);
-					}
-				}
+				retObject.email = DOMAIN ? username + '@' + DOMAIN : false;
+				ldapAsyncFut.return(retObject);
+				
 			} catch (e) {
 				ldapAsyncFut.return({
 					error: e
@@ -163,43 +142,48 @@ LDAP.prototype.bind = function(options) {
 
 };
 
-// TODO: pull out search function, expose to client
-/*
+/**
+ * Attempt to bind (authenticate) ldap
+ * and perform a dn search if specified
+ *
+ * @method search
+ *
+ * @param {Object} options  Object with username
+ */
 LDAP.prototype.search = function(options) {
-
 	var self = this;
 
 	options = options || {};
 
-	if (options.hasOwnProperty('username')) {
-
-		var ldapAsyncFut = new Future();
-
-		// Create ldap client
-		var fullUrl = URL + ':' + PORT;
-		var client = self.ldapjs.createClient({
-			url: fullUrl
-		});
-
-		var username = options.username;
-		var dn = DN_BASE.replace('[uid]',username);
-
-		client.search(dn, {}, function(err, res) {
-
-			res.on('searchEntry', function(entry) {
-				// Add entry results to return object
-				retObject.searchResults = entry.object;
-
-				ldapAsyncFut.return(retObject);
-			});
-
-		});
-
-		return ldapAsyncFut.wait();
+	if (!options.hasOwnProperty('username')) {
+		throw new Meteor.Error(403, "Missing LDAP Search Parameter");
 	}
 
+	var ldapAsyncFut = new Future();
+
+	var client = self.ldapjs.createClient({
+		url: URL + ':' + PORT
+	});
+
+	var username = options.username;
+	var dn = self.makeDn({'uid':username});
+
+	var retObject = {};
+
+		
+	client.search(dn, {}, function(err, res) {
+
+		res.on('searchEntry', function(entry) {
+			retObject.searchResults = entry.object;
+			ldapAsyncFut.return(retObject);
+		});
+
+	});
+
+	return ldapAsyncFut.wait();
 };
-*/
+
+
 
 // Register login handler with Meteor
 // Here we create a new LDAP instance with options passed from
@@ -217,12 +201,12 @@ Accounts.registerLoginHandler("ldap", function(loginRequest) {
 	var ldapObj = new LDAP(userOptions);
 
 	// Call bind and get response
-	var ldapResponse = ldapObj.bind(loginRequest);
+	var ldapBind = ldapObj.bind(loginRequest);
 
-	if (ldapResponse.error) {
+	if (ldapBind.error) {
 		return {
 			userId: null,
-			error: ldapResponse.error
+			error: ldapBind.error
 		}
 	} else {
 		// Set initial userId and token vals
@@ -233,7 +217,7 @@ Accounts.registerLoginHandler("ldap", function(loginRequest) {
 
 		// Look to see if user already exists
 		var user = Meteor.users.findOne({
-			username: ldapResponse.username
+			username: ldapBind.username
 		});
 
 		// Login user if they exist
@@ -253,13 +237,14 @@ Accounts.registerLoginHandler("ldap", function(loginRequest) {
 		// Otherwise create user if option is set
 		else if (ldapObj.options.createNewUser) {
 			var userObject = {
-				username: ldapResponse.username
+				username: ldapBind.username
 			};
 			// Set email
-			if (ldapResponse.email) userObject.email = ldapResponse.email;
+			if (ldapBind.email) userObject.email = ldapBind.email;
 
 			// Set profile values if specified in searchResultsProfileMap
-			if (ldapResponse.searchResults && ldapObj.options.searchResultsProfileMap.length > 0) {
+			if (ldapObj.options.searchResultsProfileMap.length > 0) {
+				var ldapSearch = ldapObj.search(loginRequest);
 
 				var profileMap = ldapObj.options.searchResultsProfileMap;
 				var profileObject = {};
@@ -269,8 +254,8 @@ Accounts.registerLoginHandler("ldap", function(loginRequest) {
 					var resultKey = profileMap[i].resultKey;
 
 					// If our search results have the specified property, set the profile property to its value
-					if (ldapResponse.searchResults.hasOwnProperty(resultKey)) {
-						profileObject[profileMap[i].profileProperty] = ldapResponse.searchResults[resultKey];
+					if (ldapSearch.searchResults.hasOwnProperty(resultKey)) {
+						profileObject[profileMap[i].profileProperty] = ldapSearch.searchResults[resultKey];
 					}
 
 				}
