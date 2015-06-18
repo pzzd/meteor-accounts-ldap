@@ -18,7 +18,7 @@ Package.onUse(function(api) {
   api.addFiles(['ldap_client.js'], 'client');
   api.addFiles(['ldap_server.js'], 'server');
 
-  api.export('LDAP', 'server');
-  api.export('LDAP_DEFAULTS', 'server');
+  api.export('LDAP','server');
+//  api.export('LDAP_DEFAULTS', 'server');
 });
 

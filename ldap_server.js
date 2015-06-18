@@ -45,7 +45,10 @@ LDAP_ATTRIBUTES = [
  @class LDAP
  @constructor
  */
-var LDAP = function(options) {
+ LDAP = function(options) {
+	console.log('LDAP');
+
+	options = options || {};
 
 	// set default profile fields
 	LDAP_DEFAULTS.searchResultsProfileMap = [];
@@ -64,6 +67,8 @@ var LDAP = function(options) {
 	// certain architectures. The package typ:ldap-js exports
 	// "MeteorWrapperLdapjs" which is a wrapper for the npm module
 	this.ldapjs = MeteorWrapperLdapjs;
+
+	return this;
 };
 
 
@@ -75,9 +80,6 @@ var LDAP = function(options) {
  * @param {Object} options  Object with uid
  */
 LDAP.prototype.makeDn = function(options) {
-
-	var self = this;
-
 	options = options || {};
 
 	if (!options.hasOwnProperty('uid') ) {
@@ -85,6 +87,13 @@ LDAP.prototype.makeDn = function(options) {
 	}
 
 	return DN_BASE.replace('[uid]',options.uid);
+};
+
+LDAP.prototype.makeClient = function(){
+	var client = this.ldapjs.createClient({
+		url: URL + ':' + PORT
+	});
+	return client;
 };
 
 /**
@@ -159,28 +168,25 @@ LDAP.prototype.search = function(options) {
 		throw new Meteor.Error(403, "Missing LDAP Search Parameter");
 	}
 
-	var ldapAsyncFut = new Future();
+	var future = new Future();
 
-	var client = self.ldapjs.createClient({
-		url: URL + ':' + PORT
-	});
+	var client = self.makeClient();
 
-	var username = options.username;
-	var dn = self.makeDn({'uid':username});
+	var dn = self.makeDn({'uid':options.username});
 
-	var retObject = {};
+	client.search(dn, {}, function(error, result, next) {
 
-		
-	client.search(dn, {}, function(err, res) {
+		result.on('searchEntry', function(entry) {
+			future.return(entry.object);
+		});
 
-		res.on('searchEntry', function(entry) {
-			retObject.searchResults = entry.object;
-			ldapAsyncFut.return(retObject);
+		result.on('error', function(e){
+			throw new Meteor.Error(404, "No record found");
 		});
 
 	});
 
-	return ldapAsyncFut.wait();
+	return future.wait();
 };
 
 
