@@ -46,8 +46,6 @@ LDAP_ATTRIBUTES = [
  @constructor
  */
  LDAP = function(options) {
-	console.log('LDAP');
-
 	options = options || {};
 
 	// set default profile fields
@@ -105,7 +103,6 @@ LDAP.prototype.makeClient = function(){
  * @param {Object} options  Object with username, ldapPass and overrides for LDAP_DEFAULTS object
  */
 LDAP.prototype.bind = function(options) {
-
 	var self = this;
 
 	options = options || {};
@@ -159,16 +156,14 @@ LDAP.prototype.bind = function(options) {
  *
  * @param {Object} options  Object with username
  */
-LDAP.prototype.search = function(options) {
+LDAP.prototype.search = function(options, callback) {
 	var self = this;
 
 	options = options || {};
 
 	if (!options.hasOwnProperty('username')) {
-		throw new Meteor.Error(403, "Missing LDAP Search Parameter");
+		callback('Missing LDAP Search Parameter',null);
 	}
-
-	var future = new Future();
 
 	var client = self.makeClient();
 
@@ -176,17 +171,25 @@ LDAP.prototype.search = function(options) {
 
 	client.search(dn, {}, function(error, result, next) {
 
+		var entryObject = {};
+
 		result.on('searchEntry', function(entry) {
-			future.return(entry.object);
+			entryObject = entry.object;
 		});
 
 		result.on('error', function(e){
-			throw new Meteor.Error(404, "No record found");
+			callback (e, null);
+		});
+
+		result.on('end', function(result){
+			if (result.status){
+				callback(result.errorMessage, null);
+			} else {
+				callback(null, entryObject);
+			}
 		});
 
 	});
-
-	return future.wait();
 };
 
 
