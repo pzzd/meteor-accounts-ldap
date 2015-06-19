@@ -16,6 +16,8 @@ Package.onUse(function(api) {
   api.use(['accounts-base', 'accounts-password'], 'server');
 
   api.addFiles(['client/ldap.js'], 'client');
+  api.addFiles(['client/templates.html'], 'client');
+  api.addFiles(['client/styles.css'], 'client');
   api.addFiles(['server/ldap.js'], 'server');
   api.addFiles(['server/meteor-methods.js'], 'server');
 

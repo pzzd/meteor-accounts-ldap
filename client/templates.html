@@ -1,0 +1,28 @@
+<template name='ucLdapLogin'>
+	<div class='ucLdap'>
+		<form class='loginForm'>
+			CNetID: <input type='text' name='username' />
+			Password: <input type='password' name='password' />
+			<button type='submit'>Log In</button>
+		</form>
+		<div class='loginResults'></div>
+	</div>
+</template>
+
+<template name='ucLdapLogout'>
+	<div class='ucLdap'>
+	  	{{ currentUser.profile.firstname }} {{ currentUser.profile.lastname }}
+	  	<button class='logoutButton'>Log Out</button>
+	</div>
+</template>
+
+<template name='ucLdapSearch'>
+	<div class='ucLdap'>
+		<form class='searchForm'>
+			Search a CNetID: <input type='text' name='username' />
+			<button type='submit'>Search</button>
+		</form>
+		<div class='searchResults'></div>
+	</div>
+</template>
+
