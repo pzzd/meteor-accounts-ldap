@@ -2,7 +2,7 @@ Package.describe({
   name: 'pzzd:accounts-ldap',
   version: '0.0.1',
   summary: 'Accounts login handler for University of Chicago LDAP using ldapjs from npm',
-  git: 'https://github.com/pzzd/meteor-accounts-ldap',
+  git: 'https://github.com/pzzd/meteor-accounts-ldap-uchicago',
   documentation: 'README.md'
 });
 
@@ -15,8 +15,9 @@ Package.onUse(function(api) {
 
   api.use(['accounts-base', 'accounts-password'], 'server');
 
-  api.addFiles(['client/ldap.js'], 'client');
   api.addFiles(['client/templates.html'], 'client');
+  api.addFiles(['client/events.js'], 'client');
+  api.addFiles(['client/ldap.js'], 'client');
   api.addFiles(['client/styles.css'], 'client');
   api.addFiles(['server/ldap.js'], 'server');
   api.addFiles(['server/meteor-methods.js'], 'server');

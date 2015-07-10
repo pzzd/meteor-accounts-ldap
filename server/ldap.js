@@ -45,7 +45,7 @@ LDAP_ATTRIBUTES = [
  @class LDAP
  @constructor
  */
- LDAP = function(options) {
+LDAP = function(options) {
 	options = options || {};
 
 	// set default profile fields
