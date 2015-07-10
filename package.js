@@ -12,15 +12,18 @@ Package.onUse(function(api) {
 
   api.use(['templating'], 'client');
   api.use(['typ:ldapjs@0.7.3'], 'server');
-
   api.use(['accounts-base', 'accounts-password'], 'server');
 
-  api.addFiles(['client/templates.html'], 'client');
-  api.addFiles(['client/events.js'], 'client');
-  api.addFiles(['client/ldap.js'], 'client');
-  api.addFiles(['client/styles.css'], 'client');
-  api.addFiles(['server/ldap.js'], 'server');
-  api.addFiles(['server/meteor-methods.js'], 'server');
+  api.addFiles([
+    'client/templates.html',
+    'client/events.js',
+    'client/ldap.js',
+    'client/styles.css',
+  ], 'client');
+
+  api.addFiles([
+    'server/ldap.js',
+    'server/meteor-methods.js'], 'server');
 
   api.export('LDAP','server');
 });
